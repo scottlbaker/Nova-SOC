@@ -9,7 +9,7 @@ The dga assembler outputs in a relocatable-binary format and my simulation envir
 
 Example command line:
 
-rb2hex -i t1.obj -o t1.hex
+rb2hex -i t1.rb -o t1.hex
 
 
 Compiling:
