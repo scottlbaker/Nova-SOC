@@ -1,0 +1,703 @@
+01              
+02              ;=======================================================
+03              ;=======================================================
+04              ;  Nova SOC mini monitor
+05              ;=======================================================
+06              ;=======================================================
+07              
+08              ; Note: ldb and stb are hand assembled here since the
+09              ; assembler used does not support Nova-4 ops
+10              
+11              ;=======================================================
+12              ; I/O register addresses
+13              ;=======================================================
+14              
+15              u1cntl  =10    ; UART control
+16              u1stat  =10    ; UART status
+17              u1brsr  =11    ; UART baud
+18              u1mask  =12    ; UART irq mask
+19              u1data  =13    ; UART data
+20              
+21              t1cntl  =20    ; timer control
+22              t1stat  =20    ; timer status
+23              t1icnt  =21    ; timer initial count
+24              
+25              oporta  =22    ; port A
+26              imask   =23    ; interrupt mask
+27              r8cntl  =24    ; random number start/stop
+28              r8data  =24    ; random number
+29              r8mask  =25    ; random number mask
+30              isrc    =26    ; interrupt source
+31              
+32                       .loc 0
+33              
+34 00000 000000          0     ; 
+35 00001 000000          0     ; 
+36 00002 000000          0     ; 
+37 00003 000400 initpc:  start ; initial PC value
+38 00004 000000          0
+39 00005 000000 retval:  0     ; subroutine return address
+40 00006 000000 gotadr:  0     ; used by getadr subroutine
+41 00007 000000 loopc1:  0     ; loop counter
+42 00010 000000 loopc2:  0     ; loop counter
+43 00011 000000 x0:      0     ; constant 0
+44 00012 000001 x1:      1     ; constant 1
+45 00013 000002 x2:      2     ; constant 2
+46 00014 000003 x3:      3     ; constant 3
+47 00015 000004 x4:      4     ; constant 4
+48 00016 000005 x5:      5     ; constant 5
+49 00017 000006 x6:      6     ; constant 6
+50              
+51 00020 000000 autoinc: 0
+52 00021 000000          0
+53 00022 000000          0
+54 00023 000000 dmpptr:  0     ; used by dmpmem subroutine
+55 00024 000000          0
+56 00025 000000          0
+57 00026 000000          0
+58 00027 000000          0
+59              
+60 00030 000000 autodec: 0
+61 00031 000000          0
+62 00032 000000          0
+63 00033 000000          0
+64 00034 000000          0
+65 00035 000000          0
+66 00036 000000          0
+67 00037 000000          0
+68              
+69 00040 000000 buffer:  0
+70 00041 000000          0
+71 00042 000000          0
+72 00043 000040          40
+73 00044 000000          0
+74 00045 000000          0
+75 00046 000000          0
+76 00047 000000          0
+77 00050 000000          0
+78 00051 000000          0
+79              
+80 00052 000141 asc_a:   141       ; ascii 'a'
+81 00053 000172 asc_z:   172       ; ascii 'z'
+82 00054 000060 asc_0:   60        ; ascii '0'
+83 00055 000067 asc_7:   67        ; ascii '7'
+84 00056 000071 asc_9:   71        ; ascii '9'
+85 00057 000040 space:   40        ; ascii space
+86 00060 000400 x400:    400       ; loop count
+87 00061 000010 x10:     10        ; loop count
+88 00062 000007 x7:      07        ; octal digit mask
+89              
+90 00063 017400 stktop:  017400    ; near top of 8k RAM space
+91 00064 074343 baud:    074343    ; 115200 UART baud rate
+92 00065 000004 txnotf:  000004    ; tx FIFO not full
+93 00066 000001 rxnote:  000001    ; rx FIFO not empty
+94 00067 011610 tm5sec:  011610    ; timer const 5 seconds
+95 00070 000020 tm0sec:  000020    ; fast timer const for debug
+96              
+97 00071 000222 banptr:  banner*2  ; banner  msg pointer
+98 00072 000256 proptr:  prompt*2  ; prompt  msg pointer
+99 00073 000262 crlptr:  crlf*2    ; crlf    msg pointer
+100 00074 000266 unkptr:  unknwn*2  ; unknown msg pointer
+101 00075 000312 nonptr:  nonoct*2  ; nonoct  msg pointer
+102 00076 000340 clrptr:  clrscr*2  ; clr  screen pointer
+103 00077 000354 helptr:  hlpmsg*2  ; help    msg pointer
+104              
+105 00100 000100 bufptr:  buffer*2  ; buffer pointers
+106 00101 000105 bufpt2:  buffer*2+5
+107              
+108 00102 000110 H:       110       ; ascii code "H"
+109 00103 000103 C:       103       ; ascii code "C"
+110 00104 000122 R:       122       ; ascii code "R"
+111 00105 000117 O:       117       ; ascii code "O"
+112 00106 000107 G:       107       ; ascii code "G"
+113 00107 000104 D:       104       ; ascii code "D"
+114 00110 000015 enter:   15        ; ascii code <CR>
+115              
+116                       .txtn 1
+117              
+117 00111 005015 banner:  .txt /<15><12>Welcome to Nova Monitor<15><12><0>/
+117       062527 
+117       061554 
+117       066557 
+117       020145 
+117       067564 
+117       047040 
+117       073157 
+117       020141 
+117       067515 
+117       064556 
+117       067564 
+117       006562 
+117       000012 
+118              
+118 00127 005015 prompt:  .txt /<15><12><76><0>/
+118       000076 
+119              
+119 00131 005015 crlf:    .txt /<15><12><0><0>/
+119       000000 
+120              
+120 00133 005015 unknwn:  .txt /<15><12>Unknown Command<15><12><0>/
+120       067125 
+120       067153 
+120       073557 
+120       020156 
+120       067503 
+120       066555 
+120       067141 
+120       006544 
+120       000012 
+121              
+121 00145 005015 nonoct:  .txt /<15><12>Non-Octal Address<15><12><0>/
+121       067516 
+121       026556 
+121       061517 
+121       060564 
+121       020154 
+121       062101 
+121       071144 
+121       071545 
+121       006563 
+121       000012 
+122              
+122 00160 055433 clrscr:  .txt /<33><133><62><112><33><133><61><73><61><110><0>/
+122       045062 
+122       055433 
+122       035461 
+122       044061 
+122       000000 
+123              
+124              
+124 00166 005015 hlpmsg:  .txt /<15><12><15><12>/
+124       005015 
+125              
+125 00170 067503          .txt /Command Summary:<15><12>/
+125       066555 
+125       067141 
+125       020144 
+125       072523 
+125       066555 
+125       071141 
+125       035171 
+125       005015 
+126              
+126 00201 020150          .txt /h      .. print this help message <15><12>/
+126       020040 
+126       020040 
+126       027040 
+126       020056 
+126       071160 
+126       067151 
+126       020164 
+126       064164 
+126       071551 
+126       064040 
+126       066145 
+126       020160 
+126       062555 
+126       071563 
+126       063541 
+126       020145 
+126       005015 
+127              
+127 00223 020143          .txt /c      .. clear screen<15><12>/
+127       020040 
+127       020040 
+127       027040 
+127       020056 
+127       066143 
+127       060545 
+127       020162 
+127       061563 
+127       062562 
+127       067145 
+127       005015 
+128              
+128 00237 020162          .txt /r      .. soft reset<15><12>/
+128       020040 
+128       020040 
+128       027040 
+128       020056 
+128       067563 
+128       072146 
+128       071040 
+128       071545 
+128       072145 
+128       005015 
+129              
+129 00252 020157          .txt /o      .. toggle output port<15><12>/
+129       020040 
+129       020040 
+129       027040 
+129       020056 
+129       067564 
+129       063547 
+129       062554 
+129       067440 
+129       072165 
+129       072560 
+129       020164 
+129       067560 
+129       072162 
+129       005015 
+130              
+130 00271 020147          .txt /g addr .. jump to address <15><12>/
+130       062141 
+130       071144 
+130       027040 
+130       020056 
+130       072552 
+130       070155 
+130       072040 
+130       020157 
+130       062141 
+130       071144 
+130       071545 
+130       020163 
+130       005015 
+131              
+131 00307 020144          .txt /d addr .. dump mem at address <15><12>/
+131       062141 
+131       071144 
+131       027040 
+131       020056 
+131       072544 
+131       070155 
+131       066440 
+131       066545 
+131       060440 
+131       020164 
+131       062141 
+131       071144 
+131       071545 
+131       020163 
+131       005015 
+132              
+132 00327 005015          .txt /<15><12><0><0>/
+132       000000 
+133              
+134              
+135                       .loc 400
+136              
+137              ;=======================================================
+138              ; Start Point
+139              ;=======================================================
+140              
+141 00400 020063 start:   lda   0,stktop
+142 00401 061001          mtsp  0            ; init the stack
+143 00402 060001          mtfp  0            ; and the frame
+144 00403 004456          jsr   initu1       ; init the UART
+145 00404 030071          lda   2,banptr     ; banner pointer
+146 00405 004462          jsr   puts         ; print message
+147              
+148 00406 030072 main:    lda   2,proptr     ; prompt pointer
+149 00407 004460          jsr   puts         ; print message
+150              
+151 00410 004475          jsr   getc         ; get a char
+152 00411 004465          jsr   putc         ; put a char
+153 00412 004502          jsr   touppr       ; to upper case
+154              
+155 00413 024102          lda   1,H          ; H: print help
+155 00414 106435          subz# 0,1,snr
+156              
+157 00415 000425          jmp   cxhelp
+158              
+159 00416 024103          lda   1,C          ; C: clear screen
+159 00417 106435          subz# 0,1,snr
+160              
+161 00420 000425          jmp   cxclr
+162              
+163 00421 024104          lda   1,R          ; R: restart
+163 00422 106435          subz# 0,1,snr
+164              
+165 00423 000755          jmp   start
+166              
+167 00424 024105          lda   1,O          ; O: output to port
+167 00425 106435          subz# 0,1,snr
+168              
+169 00426 000422          jmp   cxout
+170              
+171 00427 024106          lda   1,G          ; G: goto address
+171 00430 106435          subz# 0,1,snr
+172              
+173 00431 000423          jmp   cxgoto
+174              
+175 00432 024107          lda   1,D          ; D: dump memory
+175 00433 106435          subz# 0,1,snr
+176              
+177 00434 000422          jmp   cxdump
+178              
+179 00435 024110          lda   1,enter      ; enter key
+179 00436 106435          subz# 0,1,snr
+180              
+181 00437 000747          jmp   main
+182              
+183 00440 030074          lda   2,unkptr     ; unknown message
+184 00441 004426          jsr   puts         ; print message
+185              
+186 00442 030077 cxhelp:  lda   2,helptr     ; help message
+187 00443 004424          jsr   puts         ; print message
+188 00444 000742          jmp   main
+189              
+190 00445 030076 cxclr:   lda   2,clrptr     ; clear screen
+191 00446 004421          jsr   puts         ; print message
+192 00447 000737          jmp   main
+193              
+194 00450 060422 cxout:   dia   0,oporta     ; blink the LEDs
+195 00451 101400          inc   0,0          ; increment
+196 00452 061022          doa   0,oporta     ; write the port
+197 00453 000733          jmp   main
+198              
+199 00454 004452 cxgoto:  jsr   getadr       ; get address
+200 00455 002006          jmp   @gotadr      ; jump to address
+201              
+202 00456 004450 cxdump:  jsr   getadr       ; get address
+203 00457 004515          jsr   dmpmem       ; dump memory
+204 00460 000726          jmp   main         ; not implemented yet
+205              
+206              
+207              ;=======================================================
+208              ; Initialize the UART
+209              ;=======================================================
+210 00461 054005 initu1:  sta   3,retval     ; save return value
+211 00462 020064          lda   0,baud       ; baud rate
+212 00463 061011          doa   0,u1brsr
+213 00464 020014          lda   0,x3         ; enable tx and rx
+214 00465 061010          doa   0,u1cntl
+215 00466 002005          jmp   @retval      ; return
+216              
+217              ;===========================================================
+218              ; Send a string to the UART
+219              ;   AC2 contains pointer to string
+220              ;   AC0 gets the next character
+221              ;===========================================================
+222 00467 062401 puts:    sav
+223              ;        ldb   0,2          ; get the next char
+224 00470 060601 puts2:   060601             ; ldb 0,2
+225 00471 004405          jsr   putc         ; put a character
+225 00472 101005          mov   0,0,snr
+226                    ; check for null
+227 00473 062601          ret                ; return if done
+228 00474 151400          inc   2,2          ; inc string pointer
+229 00475 000773          jmp   puts2        ; repeat
+230              
+231              ;===========================================================
+232              ; Send a single character to the UART
+233              ;   AC0 has the char to send
+234              ;   AC1 gets the UART status
+235              ;   AC2 is used for bit constant (no immediate mode !!)
+236              ;===========================================================
+237 00476 062401 putc:    sav
+238 00477 030065          lda   2,txnotf     ; status mask
+239 00500 064410 putc2:   dia   1,u1stat     ; read status
+239 00501 133415          and#  1,2,snr
+240                    ; check status
+241 00502 000776          jmp   putc2        ; wait if full
+242 00503 061013          doa   0,u1data     ; put a character
+243 00504 062601          ret                ; return
+244              
+245              ;=======================================================
+246              ; Get a character from the UART
+247              ;   AC0 gets the received character
+248              ;   AC1 gets the UART status
+249              ;   AC2 is not used
+250              ;   AC3 holds the return value
+251              ;=======================================================
+252 00505 054005 getc:    sta   3,retval     ; save return value
+253 00506 020066          lda   0,rxnote
+254 00507 064410 getc2:   dia   1,u1stat     ; read status
+254 00510 123415          and#  1,0,snr
+255              
+256 00511 000776          jmp   getc2        ; wait if no char
+257 00512 060413          dia   0,u1data     ; get a char
+258 00513 002005          jmp   @retval      ; return
+259              
+260              ;=======================================================
+261              ; Convert to upper case
+262              ;   AC0 has char to convert
+263              ;   AC2 is used for bit constant (no immediate mode !!)
+264              ;   AC3 holds the return value
+265              ;=======================================================
+266 00514 054005 touppr:  sta   3,retval     ; save return value
+267 00515 030052          lda   2,asc_a      ; ascii 'a'
+267 00516 142433          subz# 2,0,snc
+268                    ; check lower bound
+269 00517 000406          jmp   touppx       ; return if below 'a'
+270 00520 030053          lda   2,asc_z      ; ascii 'z'
+270 00521 112433          subz# 0,2,snc
+271                    ; check upper bound
+272 00522 000403          jmp   touppx       ; return if above 'z'
+273 00523 030057          lda   2,space      ; ascii space
+274 00524 142420          subz  2,0          ; convert to upper
+275 00525 002005 touppx:  jmp   @retval      ; return
+276              
+277              ;=======================================================
+278              ; Get address (6-digit ascii octal to binary)
+279              ;   AC3 is not used
+280              ;   AC2 is used as ldb/stb byte pointer
+281              ;   AC1 is used in computations
+282              ;   AC0 gets the resulting binary address
+283              ;   and this address is also stored to memory @gotadr
+284              ;=======================================================
+285 00526 062401 getadr:  sav
+286 00527 020057          lda   0,space
+287 00530 004746          jsr   putc         ; put a space
+288 00531 020017          lda   0,x6         ; load loop count
+289 00532 040007          sta   0,loopc1     ; loop counter
+290 00533 030100          lda   2,bufptr     ; ldb/stb pointer
+291 00534 004751 getad1:  jsr   getc         ; AC0 gets char
+292 00535 004741          jsr   putc         ; print char
+293 00536 004524          jsr   isoct        ; check if char is octal
+293 00537 101003          mov   0,0,snc
+294                    ; skip if carry set
+295 00540 000406          jmp   getad2       ; continue if octal
+296 00541 030075          lda   2,nonptr     ; non-octal message
+297 00542 004725          jsr   puts         ; reject non-octal
+298 00543 020635          lda   0,start      ; start address
+299 00544 040006          sta   0,gotadr
+300 00545 062601          ret                ; return
+301 00546 024054 getad2:  lda   1,asc_0      ; ascii '0'
+302 00547 122420          subz  1,0          ; ascii to binary
+303              ;        stb   0,2          ; store digit
+304 00550 062201          062201             ; stb 0,2
+305 00551 151400          inc   2,2          ; inc buffer pointer
+306 00552 014007          dsz   loopc1       ; dec loop count
+307 00553 000761          jmp   getad1       ; repeat if not done
+308              
+309 00554 020016          lda   0,x5         ; load loop count
+310 00555 040007          sta   0,loopc1     ; loop counter
+311 00556 030100          lda   2,bufptr     ; ldb/stb pointer
+312              ;        ldb   0,2          ; get the first char
+313 00557 060601          060601             ; ldb 0,2
+314 00560 151400          inc   2,2          ; inc buffer pointer
+315 00561 101120 getad3:  movzl 0,0          ; shift 1
+316 00562 101120          movzl 0,0          ; shift 2
+317 00563 101120          movzl 0,0          ; shift 3
+318              ;        ldb   1,2          ; get the next char
+319 00564 064601          064601             ; ldb 1,2
+320 00565 123020          addz  1,0
+321 00566 151400          inc   2,2          ; inc buffer pointer
+322 00567 014007          dsz   loopc1       ; dec loop count
+323 00570 000771          jmp   getad3       ; repeat if not done
+324 00571 040006          sta   0,gotadr
+325 00572 040023          sta   0,dmpptr
+326 00573 062601          ret                ; return
+327              
+328              ;=======================================================
+329              ; Dump memory
+330              ;   AC3 is used to store the return address by jsr
+331              ;   AC2 is used as string pointer
+332              ;   AC1 is not used
+333              ;   AC0 is used in computations
+334              ;   The dmpptr autoinc location is used to sequence
+335              ;   through the memory locations to dump
+336              ;   The loopc1 counter counts the total words
+337              ;   The loopc2 counter counts words-per-line
+338              ;=======================================================
+339 00574 062401 dmpmem:  sav
+340 00575 030073          lda   2,crlptr
+341 00576 004671          jsr   puts         ; print crlf
+342 00577 020060          lda   0,x400
+343 00600 040007          sta   0,loopc1     ; word counter
+344 00601 020061          lda   0,x10
+345 00602 040010          sta   0,loopc2     ; word-per-line counter
+346 00603 022023 dumpm2:  lda   0,@dmpptr    ; get memory
+347 00604 004414          jsr   i2oct
+348 00605 030100          lda   2,bufptr
+349 00606 004661          jsr   puts         ; print buffer
+350 00607 014010          dsz   loopc2       ; dec loop count
+351 00610 000405          jmp   dumpm3
+352 00611 030073          lda   2,crlptr
+353 00612 004655          jsr   puts         ; print crlf
+354 00613 020061          lda   0,x10        ; reload
+355 00614 040010          sta   0,loopc2     ; word-per-line counter
+356 00615 014007 dumpm3:  dsz   loopc1       ; dec loop count
+357 00616 000765          jmp   dumpm2       ; repeat if not done
+358 00617 062601          ret                ; return
+359              
+360              ;=======================================================
+361              ; Convert binary to ASCII octal
+362              ;   AC3 is used in computations
+363              ;   AC2 is used as ldb/stb byte pointer
+364              ;   AC1 is used in computations
+365              ;   AC0 has the 16-bit binary integer to convert
+366              ;   The resulting octal ascii string is placed in
+367              ;   a string buffer (in memory)
+368              ;=======================================================
+369 00620 054005 i2oct:   sta   3,retval     ; save return value
+370 00621 030101          lda   2,bufpt2
+371 00622 105000 i2oc2:   mov   0,1
+372 00623 034062          lda   3,x7         ; AC3 gets mask
+373 00624 167400          and   3,1
+374 00625 034054          lda   3,asc_0
+375 00626 167000          add   3,1
+376              ;        stb   1,2          ; store octal digit
+377 00627 066201          066201             ; stb 1,2
+378 00630 150400          neg   2,2          ; programming trick
+379 00631 150000          com   2,2          ; to dec byte pointer
+380 00632 101220          movzr 0,0          ; shift right
+381 00633 101220          movzr 0,0          ; to get the
+382 00634 101220          movzr 0,0          ; next octal digit
+383 00635 024100          lda   1,bufptr     ; loop check
+383 00636 146434          subz# 2,1,szr
+384              
+385 00637 000763          jmp   i2oc2        ; repeat
+386 00640 105000          mov   0,1
+387 00641 034012          lda   3,x1         ; AC3 gets mask
+388 00642 167400          and   3,1
+389 00643 034054          lda   3,asc_0
+390 00644 167000          add   3,1
+391              ;        stb   1,2          ; store octal digit
+392 00645 066201          066201             ; stb 1,2
+393 00646 002005          jmp   @retval      ; return
+394              
+395              ;=======================================================
+396              ; Check if digit (clear carry bit if digit)
+397              ;=======================================================
+398 00647 054005 isdig:   sta   3,retval     ; save return value
+399 00650 030054          lda   2,asc_0      ; ascii '0'
+399 00651 142433          subz# 2,0,snc
+400                    ; check lower bound
+401 00652 000406          jmp   nodig        ; return if below '0'
+402 00653 030056          lda   2,asc_9      ; ascii '9'
+402 00654 112433          subz# 0,2,snc
+403                    ; check upper bound
+404 00655 000403          jmp   nodig        ; return if above '9'
+405 00656 151020          movz  2,2          ; is digit: clear carry
+406 00657 002005          jmp   @retval      ; return
+407 00660 151040 nodig:   movo  2,2          ; no digit: set carry
+408 00661 002005          jmp   @retval      ; return
+409              
+410              ;=======================================================
+411              ; Check if octal (clear carry bit if octal)
+412              ;=======================================================
+413 00662 054005 isoct:   sta   3,retval     ; save return value
+414 00663 024054          lda   1,asc_0      ; ascii '0'
+414 00664 122433          subz# 1,0,snc
+415                    ; check lower bound
+416 00665 000406          jmp   nooct        ; return if below '0'
+417 00666 024055          lda   1,asc_7      ; ascii '7'
+417 00667 106433          subz# 0,1,snc
+418                    ; check upper bound
+419 00670 000403          jmp   nooct        ; return if above '7'
+420 00671 101020          movz  0,0          ; is octal: clear carry
+421 00672 002005          jmp   @retval      ; return
+422 00673 101040 nooct:   movo  0,0          ; no octal: set carry
+423 00674 002005          jmp   @retval      ; return
+424              
+425              ;===========================================================
+426              ; Wait
+427              ;===========================================================
+428 00675 054005 wait1:   sta   3,retval     ; save return value
+429 00676 020067          lda   0,tm5sec     ; initial count
+430 00677 061021          doa   0,t1icnt
+431 00700 020012          lda   0,x1         ; start timer
+432 00701 061020          doa   0,t1cntl
+433 00702 060420 wait2:   dia   0,t1stat     ; wait loop
+433 00703 101005          mov   0,0,snr
+434              
+435 00704 000776          jmp   wait2
+436 00705 020011          lda   0,x0         ; stop timer
+437 00706 061020          doa   0,t1cntl
+438 00707 002005          jmp   @retval      ; return
+439              
+440                       .end start
+
+ASC_0   000054        1/82
+ASC_7   000055        1/83
+ASC_9   000056        1/84
+ASC_A   000052        1/80
+ASC_Z   000053        1/81
+AUTODEC 000030        1/60
+AUTOINC 000020        1/51
+BANNER  000111        1/118
+BANPTR  000071        1/97
+BAUD    000064        1/91
+BUFFER  000040        1/69
+BUFPT2  000101        1/106
+BUFPTR  000100        1/105
+C       000103        1/109
+CLRPTR  000076        1/102
+CLRSCR  000160        1/123
+CRLF    000131        1/120
+CRLPTR  000073        1/99
+CXCLR   000445        1/190
+CXDUMP  000456        1/202
+CXGOTO  000454        1/199
+CXHELP  000442        1/186
+CXOUT   000450        1/194
+D       000107        1/113
+DMPMEM  000574        1/339
+DMPPTR  000023        1/54
+DUMPM2  000603        1/346
+DUMPM3  000615        1/356
+ENTER   000110        1/114
+G       000106        1/112
+GETAD1  000534        1/291
+GETAD2  000546        1/301
+GETAD3  000561        1/315
+GETADR  000526        1/285
+GETC    000505        1/252
+GETC2   000507        1/254
+GOTADR  000006        1/40
+H       000102        1/108
+HELPTR  000077        1/103
+HLPMSG  000166        1/125
+I2OC2   000622        1/371
+I2OCT   000620        1/369
+IMASK   000023        1/25
+INITPC  000003        1/37
+INITU1  000461        1/210
+ISDIG   000647        1/398
+ISOCT   000662        1/413
+ISRC    000026        1/29
+LOOPC1  000007        1/41
+LOOPC2  000010        1/42
+MAIN    000406        1/148
+NODIG   000660        1/407
+NONOCT  000145        1/122
+NONPTR  000075        1/101
+NOOCT   000673        1/422
+O       000105        1/111
+OPORTA  000022        1/24
+PROMPT  000127        1/119
+PROPTR  000072        1/98
+PUTC    000476        1/237
+PUTC2   000500        1/239
+PUTS    000467        1/222
+PUTS2   000470        1/224
+R       000104        1/110
+R8CNTL  000024        1/26
+R8DATA  000024        1/27
+R8MASK  000025        1/28
+RETVAL  000005        1/39
+RXNOTE  000066        1/93
+SPACE   000057        1/85
+START   000400        1/141
+STKTOP  000063        1/90
+T1CNTL  000020        1/20
+T1ICNT  000021        1/22
+T1STAT  000020        1/21
+TM0SEC  000070        1/95
+TM5SEC  000067        1/94
+TOUPPR  000514        1/266
+TOUPPX  000525        1/275
+TXNOTF  000065        1/92
+U1BRSR  000011        1/16
+U1CNTL  000010        1/14
+U1DATA  000013        1/18
+U1MASK  000012        1/17
+U1STAT  000010        1/15
+UNKNWN  000133        1/121
+UNKPTR  000074        1/100
+WAIT1   000675        1/428
+WAIT2   000702        1/433
+X0      000011        1/43
+X1      000012        1/44
+X10     000061        1/87
+X2      000013        1/45
+X3      000014        1/46
+X4      000015        1/47
+X400    000060        1/86
+X5      000016        1/48
+X6      000017        1/49
+X7      000062        1/88
